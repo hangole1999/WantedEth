@@ -4,6 +4,51 @@ import "github.com/oraclize/ethereum-api/oraclizeAPI.sol";
 
 contract WantedEth {
     
+    // Events
+    
+    event onCreatePlayer (
+        
+        uint256 indexed playerId,
+        address indexed player,
+        bytes32 indexed playerName,
+        uint256 timeStamp
+        
+    );
+    
+    event onWanted (
+        
+        uint256 indexed monsterId,
+        address indexed creator,
+        bytes32 indexed monsterName,
+        uint balance,
+        uint256 timeStamp
+        
+    );
+    
+    event onHunt (
+      
+        bytes32 queryId,
+        address hunterAddress,
+        bytes32 monsterNameByte,
+        uint hunterValue,
+        uint monsterValue,
+        uint256 timeStamp
+        
+    );
+    
+    event onResultHunt (
+      
+        bytes32 queryId,
+        uint256 hunterId,
+        uint256 monsterId,
+        uint hunterValue,
+        uint monsterValue,
+        bool isSuccess,
+        uint receivedBounty,
+        uint256 timeStamp
+        
+    );
+    
     // Variables
     
     address public owner;
@@ -52,7 +97,7 @@ contract WantedEth {
         
     }
     
-    function wanted(string _name) public payable _isHuman() {
+    function wanted(string _name) public payable _isHuman() _valueLimit(msg.value) {
         
         bytes32 _nameByte = stringToBytes32(_name);
         
@@ -60,7 +105,7 @@ contract WantedEth {
         
     }
     
-    function hunt(string _target) public payable _isHuman() {
+    function hunt(string _target) public payable _isHuman() _valueLimit(msg.value) {
         
         bytes32 _monsterNameByte = stringToBytes32(_target);
         
@@ -68,11 +113,31 @@ contract WantedEth {
         
     }
     
-    function __callbackHunting(address _address, uint _value) public {
+    function __callbackCreatePlayer(uint256 _playerId, address _address, bytes32 _nameByte) public {
         
-        require(_value > 0 && _value <= address(this).balance, "Balance error");
+        emit onCreatePlayer(_playerId, _address, _nameByte, now);
         
-        _address.transfer(_value);
+    }
+    
+    function __callbackWanted(uint256 _monsterId, address _creator, bytes32 _nameByte, uint _balance) public {
+        
+        emit onWanted(_monsterId, _creator, _nameByte, _balance, now);
+        
+    }
+    
+    function __callbackHunt(bytes32 _queryId, address _hunter, bytes32 _monsterNameByte, uint _hunterValue, uint _monsterValue) public {
+        
+        emit onHunt(_queryId, _hunter, _monsterNameByte, _hunterValue, _monsterValue, now);
+        
+    }
+    
+    function __callbackResultHunt(bytes32 _queryId, uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue, bool _isSuccess, uint _receivedBounty, address _hunter) public payable {
+        
+        emit onResultHunt(_queryId, _hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, _receivedBounty, now);
+        
+        require(_receivedBounty > 0 && _receivedBounty <= address(this).balance, "Balance error");
+        
+        _hunter.transfer(_receivedBounty);
         
     }
     
@@ -94,58 +159,6 @@ contract WantedEth {
 }
 
 contract WantedEthCore is usingOraclize {
-    
-    // Events
-    
-    event onCreatePlayer (
-        
-        uint256 indexed playerId,
-        address indexed player,
-        bytes32 indexed playerName,
-        uint256 timeStamp
-        
-    );
-    
-    event onWanted (
-        
-        uint256 indexed monsterId,
-        address indexed creator,
-        bytes32 indexed monsterName,
-        uint balance,
-        uint256 timeStamp
-        
-    );
-    
-    event onHunt (
-      
-        bytes32 queryId,
-        address hunterAddress,
-        bytes32 monsterNameByte,
-        uint hunterValue,
-        uint monsterValue,
-        uint256 timeStamp
-        
-    );
-    
-    event onResultHunt (
-      
-        bytes32 queryId,
-        uint256 hunterId,
-        uint256 monsterId,
-        uint hunterValue,
-        uint monsterValue,
-        bool isSuccess,
-        uint receivedBounty,
-        uint256 timeStamp
-        
-    );
-    
-    event onOralizeError (
-        
-        string error,
-        uint256 timeStamp
-        
-    );
     
     // Structures
     
@@ -221,7 +234,7 @@ contract WantedEthCore is usingOraclize {
         playerM[playerIdCount]._nameByte = _nameByte;
         playerIdNameM[_nameByte] = playerIdCount;
         
-        emit onCreatePlayer(playerIdCount, _address, _nameByte, now);
+        publicNetwork.__callbackCreatePlayer(playerIdCount, _address, _nameByte);
         
     }
     
@@ -233,7 +246,7 @@ contract WantedEthCore is usingOraclize {
         monsterM[monsterIdCount]._nameByte = _nameByte;
         monsterM[monsterIdCount]._balance = _balance;
         
-        emit onWanted(monsterIdCount, _creator, _nameByte, _balance, now);
+        publicNetwork.__callbackWanted(monsterIdCount, _creator, _nameByte, _balance);
         
     }
     
@@ -259,7 +272,7 @@ contract WantedEthCore is usingOraclize {
         
         monsterM[_monsterId]._balance = 0;
         
-        emit onHunt(_queryId, _hunter, _monsterNameByte, _value, huntHistoryM[huntHistoryIdCount]._monsterValue, now);
+        publicNetwork.__callbackHunt(_queryId, _hunter, _monsterNameByte, _value, huntHistoryM[huntHistoryIdCount]._monsterValue);
         
     }
     
@@ -285,25 +298,30 @@ contract WantedEthCore is usingOraclize {
             
             uint randomNumber = uint(sha3(_result)) % _sumValue;
             
-            bool _isSuccess = randomNumber <= _hunterValue;
+            bool _isSuccess = randomNumber >= _hunterValue;
+            
+            uint _receivedBounty = 0;
+            uint _monsterBalance = 0;
+            
+            address _hunter = playerM[_hunterId]._address;
             
             huntHistoryM[_huntHistoryId]._isSuccess = _isSuccess;
-                
+            
             if (_isSuccess) {
-                huntHistoryM[_huntHistoryId]._receivedBounty = _sumValue;
+                _receivedBounty = _sumValue;
             } else {
-                monsterM[_monsterId]._balance = _sumValue;
+                _monsterBalance = _sumValue;
             }
+            
+            huntHistoryM[_huntHistoryId]._receivedBounty = _receivedBounty;
+            monsterM[_monsterId]._balance = _monsterBalance;
             
             huntHistoryM[_huntHistoryId]._finished = true;
             
-            emit onResultHunt(_queryId, _hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, _isSuccess ? _sumValue : 0, now);
-            
-            publicNetwork.__callbackHunting(playerM[_hunterId]._address, _isSuccess ? _sumValue : 0);
+            publicNetwork.__callbackResultHunt(_queryId, _hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, _receivedBounty, _hunter);
             
         }
         
     }
     
 }
-
