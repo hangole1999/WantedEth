@@ -23,15 +23,7 @@ contract WantedEth {
     );
     
     event onHunt (
-        bytes32 indexed queryId,
-        uint256 hunterId,
-        uint256 monsterId,
-        uint hunterValue,
-        uint monsterValue,
-        uint256 timeStamp
-    );
-    
-    event onResultHunt (
+        uint256 _huntHistoryId,
         uint256 hunterId,
         uint256 monsterId,
         uint hunterValue,
@@ -56,6 +48,13 @@ contract WantedEth {
         _;
     }
     
+    // Transfer Ownership
+    function transferOwnership(address _newOwner) public _isOwner() {
+        if (_newOwner != address(0)) {
+            owner = _newOwner;
+        }
+    }
+    
     // Public Interfaces
     function setPrivateNetwork(address _address) public _isOwner() {
         privateNetwork = WantedEthCore(_address);
@@ -70,16 +69,19 @@ contract WantedEth {
     }
     
     function wanted(string _name) public payable {
+        require(msg.value > 0, "Require ether");
+        
         bytes32 _nameByte = stringToBytes32(_name);
         
         privateNetwork.wanted(msg.sender, _nameByte, msg.value);
     }
     
     function hunt(string _target) public payable {
+        require(msg.value > 0, "Require ether");
+        
         bytes32 _targetByte = stringToBytes32(_target);
         
         privateNetwork.hunt(msg.sender, _targetByte, msg.value);
-        // privateNetwork.hunt.value(200000)(msg.sender, _targetByte, msg.value);
     }
     
     // Callback Functions
@@ -91,16 +93,14 @@ contract WantedEth {
         emit onWanted(_monsterId, _creator, _nameByte, _balance, now);
     }
     
-    function __callbackHunt(bytes32 _queryId, uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue) public {
-        emit onHunt(_queryId, _hunterId, _monsterId, _hunterValue, _monsterValue, now);
-    }
-    
-    function __callbackResultHunt(uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue, bool _isSuccess, address _hunter) public {
-        if (_isSuccess && _hunterValue + _monsterValue <= address(this).balance) {
+    function __callbackHunt(uint256 _huntHistoryId, uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue, bool _isSuccess, address _hunter) public {
+        if (_isSuccess) {
+            require(_hunterValue + _monsterValue <= address(this).balance, "Balance Error");
+            
             _hunter.transfer(_hunterValue + _monsterValue);
         }
         
-        emit onResultHunt(_hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, now);
+        emit onHunt(_huntHistoryId, _hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, now);
     }
     
     // Library
@@ -134,13 +134,11 @@ contract WantedEthCore is usingOraclize {
     }
     
     struct HuntHistory {
-        bytes32 _queryId;
         uint256 _hunterId;
         uint256 _monsterId;
         uint _hunterValue;
         uint _monsterValue;
         bool _isSuccess;
-        bool _isFinished;
     }
     
     // Variables
@@ -161,10 +159,19 @@ contract WantedEthCore is usingOraclize {
     
     WantedEth internal publicNetwork;
     
+    uint public randomValue;
+    
     // Modifiers
     modifier _isOwner() {
         require(msg.sender == owner);
         _;
+    }
+    
+    // Transfer Ownership
+    function transferOwnership(address _newOwner) public _isOwner() {
+        if (_newOwner != address(0)) {
+            owner = _newOwner;
+        }
     }
     
     // Constructor
@@ -173,9 +180,12 @@ contract WantedEthCore is usingOraclize {
         
         oraclize_setProof(proofType_Ledger);
         
+        randomValue = 0;
         playerIdCount = 0;
         monsterIdCount = 0;
         huntHistoryIdCount = 0;
+        
+        setRandomValue();
     }
     
     // Interfaces
@@ -184,6 +194,9 @@ contract WantedEthCore is usingOraclize {
     }
     
     function createPlayer(address _address, bytes32 _nameByte) public {
+        require(playerIdAddressM[_address] == 0, "Require unique address");
+        require(playerIdNameM[_nameByte] == 0, "Require unique name");
+        
         playerIdCount++;
         
         playerIdAddressM[_address] = playerIdCount;
@@ -195,6 +208,8 @@ contract WantedEthCore is usingOraclize {
     }
     
     function wanted(address _creator, bytes32 _nameByte, uint _balance) public {
+        require(monsterIdNameM[_nameByte] == 0, "Require unique name");
+        
         monsterIdCount++;
         monsterIdNameM[_nameByte] = monsterIdCount;
         
@@ -207,64 +222,54 @@ contract WantedEthCore is usingOraclize {
         publicNetwork.__callbackWanted(monsterIdCount, _creator, _nameByte, _balance);
     }
     
-    function hunt(address _hunter, bytes32 _monsterNameByte, uint _hunterValue) public payable {
-        bytes32 _queryId = 0x0;
+    function hunt(address _hunter, bytes32 _monsterNameByte, uint _hunterValue) public {
         uint256 _hunterId = playerIdAddressM[_hunter];
         uint256 _monsterId = monsterIdNameM[_monsterNameByte];
         uint _monsterValue = monsterM[_monsterId]._balance;
+        bool _isSuccess = false;
+        
+        require(_hunterId > 0 && _monsterId > 0 && _monsterValue > 0 && randomValue > 0, "Preprocessing Error");
+        
+        uint _sumValue = _hunterValue + _monsterValue;
+        
+        _isSuccess = (random() % _sumValue) <= _hunterValue;
         
         huntHistoryIdCount++;
         
-        _queryId = oraclize_newRandomDSQuery(0, 7, 200000);
-        
-        huntHistoryIdQueryId[_queryId] = huntHistoryIdCount;
-        
         huntHistoryM[huntHistoryIdCount] = HuntHistory({
-            _queryId: _queryId,
             _hunterId: _hunterId,
             _monsterId: _monsterId,
             _hunterValue: _hunterValue,
             _monsterValue: _monsterValue,
-            _isSuccess: false,
-            _isFinished: false
+            _isSuccess: _isSuccess
         });
         
         monsterM[_monsterId]._balance = 0;
         
-        publicNetwork.__callbackHunt(_queryId, _hunterId, _monsterId, _hunterValue, _monsterValue);
+        if (!_isSuccess) {
+            monsterM[_monsterId]._balance = _sumValue;
+        }
+        
+        publicNetwork.__callbackHunt(huntHistoryIdCount, _hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, _hunter);
     }
     
-    // Oraclize Callback
+    // Set Random from Oraclize Function
+    function setRandomValue() public payable _isOwner() {
+        oraclize_newRandomDSQuery(0, 7, 200000);
+    }
+    
+    // Oraclize Callback Function
     function __callback(bytes32 _queryId, string _result, bytes _proof) public {
         require(msg.sender == oraclize_cbAddress(), "Require __callback address is Oraclize address");
         
         if (oraclize_randomDS_proofVerify__returnCode(_queryId, _result, _proof) == 0) {
-            uint256 _huntHistoryId = huntHistoryIdQueryId[_queryId];
-            
-            uint256 _hunterId = huntHistoryM[_huntHistoryId]._hunterId;
-            uint256 _monsterId = huntHistoryM[_huntHistoryId]._monsterId;
-            uint _hunterValue = huntHistoryM[_huntHistoryId]._hunterValue;
-            uint _monsterValue = huntHistoryM[_huntHistoryId]._monsterValue;
-            bool _isSuccess = false;
-            bool _isFinished = true;
-            
-            address _hunter = playerM[_hunterId]._address;
-            
-            uint _sumValue = _hunterValue + _monsterValue;
-            
-            uint randomNumber = uint(sha3(_result)) % _sumValue;
-            
-            _isSuccess = randomNumber <= _hunterValue;
-            
-            if (!_isSuccess) {
-                monsterM[_monsterId]._balance = _sumValue;
-            }
-            
-            huntHistoryM[huntHistoryIdCount]._isSuccess = _isSuccess;
-            huntHistoryM[huntHistoryIdCount]._isFinished = _isFinished;
-            
-            publicNetwork.__callbackResultHunt(_hunterId, _monsterId, _hunterValue, _monsterValue, _isSuccess, _hunter);
+            randomValue = uint(sha256(_result));
         }
+    }
+    
+    // Random Function
+    function random() private view returns (uint) {
+        return uint(sha256(block.timestamp, block.difficulty)) * randomValue;
     }
     
     // Getters
@@ -298,14 +303,13 @@ contract WantedEthCore is usingOraclize {
         );
     }
     
-    function getHuntHistory(uint256 _huntHistoryId) public view returns(uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue, bool _isSuccess, bool _isFinished) {
+    function getHuntHistory(uint256 _huntHistoryId) public view returns(uint256 _hunterId, uint256 _monsterId, uint _hunterValue, uint _monsterValue, bool _isSuccess) {
         return (
             huntHistoryM[_huntHistoryId]._hunterId, 
             huntHistoryM[_huntHistoryId]._monsterId, 
             huntHistoryM[_huntHistoryId]._hunterValue, 
             huntHistoryM[_huntHistoryId]._monsterValue, 
-            huntHistoryM[_huntHistoryId]._isSuccess, 
-            huntHistoryM[_huntHistoryId]._isFinished
+            huntHistoryM[_huntHistoryId]._isSuccess
         );
     }
     
