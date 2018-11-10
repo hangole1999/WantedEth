@@ -5,7 +5,7 @@
     <p v-else id="no-metamask"><i aria-hidden="true" class="fa fa-times"></i> Metamask not found</p>
     <p>Network: {{network}}</p>
     <p>Account: {{coinbase}}</p>
-    <p>Balance: {{(parseInt(balance) / 1000000000000000000).toFixed(3)}} Ether ({{(parseInt(balance) / 1000000000).toFixed(3)}} Gwei / {{balance}} Wei)</p>
+    <p>Balance: {{numberWithCommas((parseInt(balance) / 1000000000000000000).toFixed(3))}} Ether ({{numberWithCommas((parseInt(balance) / 1000000000).toFixed(3))}} Gwei / {{numberWithCommas(balance)}} Wei)</p>
   </div>
 </template>
   
@@ -14,6 +14,11 @@ import {NETWORKS} from '../util/networks';
 
 export default {
   name: 'hello-metamask',
+  methods: {
+    numberWithCommas(x) {
+      return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+  },
   computed: {
     isInjected: state => state.web3.isInjected,
     network: state => NETWORKS[state.web3.networkId],
@@ -26,4 +31,5 @@ export default {
 };
 </script>
   
-<style scoped></style>
+<style scoped>
+</style>

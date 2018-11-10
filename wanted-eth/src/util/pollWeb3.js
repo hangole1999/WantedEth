@@ -34,5 +34,5 @@ let pollWeb3 = state => {
     }
   }, 500);
 }
-  
+
 export default pollWeb3;

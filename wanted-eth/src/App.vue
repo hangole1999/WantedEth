@@ -2,11 +2,13 @@
 <template lang="html">
   <div id="app">
     <hello-metamask/>
+    <WantedEth/>
   </div>
 </template>
 
 <script>
 import HelloMetamask from './components/hello-metamask.vue';
+import WantedEth from './components/wanted-eth-component.vue';
 export default {
   name: 'wanted-eth-dapp',
   beforeCreate () {
@@ -19,7 +21,8 @@ export default {
     };
   },
   components: { 
-    HelloMetamask 
+    HelloMetamask,
+    WantedEth
   }
 };
 </script>
