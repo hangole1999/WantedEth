@@ -1,19 +1,25 @@
 
 <template>
-    <div class="casino">
+    <div class="wanted-eth">
         <h1>Welcome to the Wanted Ethereum</h1>
         <h4>Let's hunt wanted ethereum !</h4>
         <ul>
-            <li v-on:click='registerPlayer'>Register Player</li>
-            <li v-on:click='wantedEthereum'>Wanted Ethereum</li>
-            <li v-on:click='huntingEthereum'>Hunting Ethereum</li>
+            <li>
+                <button v-on:click='openPopup("registerPlayer")'>Register Player</button>
+                </li>
+            <li>
+                <button v-on:click='openPopup("wantedEthereum")'>Wanted Ethereum Monster</button>
+            </li>
+            <li>
+                <button v-on:click='openPopup("huntingEthereum")'>Hunting Ethereum Monster</button>
+            </li>
         </ul>
     </div>
 </template>
 
 <script>
 export default {
-    name: 'wanted-eth',
+    name: 'WantedEth',
     data () {
         return {
             amount: null,
@@ -22,6 +28,9 @@ export default {
         }
     },
     methods: {
+        openPopup(target) {
+            this.$parent.popup.show = target;
+        },
         registerPlayer(event) {
             console.log('registerPlayer()');
         },
@@ -63,22 +72,6 @@ export default {
     mounted () {
         console.log('dispatching getContractInstance');
         this.$store.dispatch('getContractInstance');
-    },
-    actions: {
-        async getContractInstance({ commit }) {
-            try {
-                let result = await getContract;
-                commit('registerContractInstance', result);
-            } catch (err) {
-                console.log('error in action getContractInstance', err);
-            }
-        }
-    },
-    mutation: {
-        registerContractInstance(state, payload) {
-            console.log('Wanted Ethereum contract instance: ', payload);
-            state.contractInstance = () => payload;
-        }
     }
 };
 </script>

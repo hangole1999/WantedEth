@@ -1,11 +1,12 @@
 
 <template>
   <div class='metamask-info'>
-    <p v-if="isInjected" id="has-metamask"><i aria-hidden="true" class="fa fa-check"></i> Metamask installed</p>
-    <p v-else id="no-metamask"><i aria-hidden="true" class="fa fa-times"></i> Metamask not found</p>
-    <p>Network: {{network}}</p>
-    <p>Account: {{coinbase}}</p>
-    <p>Balance: {{numberWithCommas((parseInt(balance) / 1000000000000000000).toFixed(3))}} Ether ({{numberWithCommas((parseInt(balance) / 1000000000).toFixed(3))}} Gwei / {{numberWithCommas(balance)}} Wei)</p>
+    <p v-if="!isInjected" id="no-metamask" class="cr">Can't read Ethereum Wallet</p>
+    <div v-if="isInjected">
+      <p>{{network}}</p>
+      <p>{{coinbase}}</p>
+      <p>{{numberWithCommas((parseInt(balance) / 1000000000000000000).toFixed(3))}} Ether ({{numberWithCommas((parseInt(balance) / 1000000000).toFixed(3))}} Gwei / {{numberWithCommas(balance)}} Wei)</p>
+    </div>
   </div>
 </template>
   
@@ -13,7 +14,7 @@
 import {NETWORKS} from '../util/networks';
 
 export default {
-  name: 'hello-metamask',
+  name: 'HelloMetamask',
   methods: {
     numberWithCommas(x) {
       return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");

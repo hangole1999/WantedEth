@@ -1,57 +1,56 @@
 
 <template lang="html">
   <div id="app">
+    <div class="background"></div>
     <hello-metamask/>
     <WantedEth/>
+    <RegisterPlayerPopup v-if="showRegisterPlayerPopup" @close="popup.show = ''"/>
+    <WantedEthereumPopup v-if="showWantedEthereumPopup" @close="popup.show = ''"/>
+    <HuntingEthereumPopup v-if="showHuntingEthereumPopup" @close="popup.show = ''"/>
   </div>
 </template>
 
 <script>
-import HelloMetamask from './components/hello-metamask.vue';
-import WantedEth from './components/wanted-eth-component.vue';
+import HelloMetamask from './components/HelloMetamask.vue';
+import WantedEth from './components/WantedEthComponent.vue';
+import RegisterPlayerPopup from './components/RegisterPlayerPopup.vue';
+import WantedEthereumPopup from './components/WantedEthereumPopup.vue';
+import HuntingEthereumPopup from './components/HuntingEthereumPopup.vue';
+
 export default {
-  name: 'wanted-eth-dapp',
-  beforeCreate () {
-    console.log('registerWeb3 Action dispatched from wanted-eth-dapp.vue');
-    this.$store.dispatch('registerWeb3');
+  name: 'WantedEthDApp',
+  components: { 
+    HelloMetamask,
+    WantedEth,
+    RegisterPlayerPopup,
+    WantedEthereumPopup,
+    HuntingEthereumPopup
   },
   data () {
     return {
-      msg: 'Welcome to Your Vue.js App'
+      popup: {
+        show: ''
+      }
     };
   },
-  components: { 
-    HelloMetamask,
-    WantedEth
+  computed: {
+    showRegisterPlayerPopup() {
+      return this.popup.show == 'registerPlayer';
+    },
+    showWantedEthereumPopup() {
+      return this.popup.show == 'wantedEthereum';
+    },
+    showHuntingEthereumPopup() {
+      return this.popup.show == 'huntingEthereum';
+    }
+  },
+  beforeCreate () {
+    console.log('registerWeb3 Action dispatched from wanted-eth-dapp.vue');
+    this.$store.dispatch('registerWeb3');
   }
 };
 </script>
 
 <style>
-#app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-
-h1, h2 {
-  font-weight: normal;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-
-a {
-  color: #42b983;
-}
+@import "assets/css/styles.css";
 </style>

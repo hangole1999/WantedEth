@@ -3,6 +3,7 @@ import Vuex from 'vuex';
 import state from './state';
 import getWeb3 from '../util/getWeb3';
 import pollWeb3 from '../util/pollWeb3';
+import getContract from '../util/getContract';
     
 Vue.use(Vuex);
     
@@ -18,6 +19,14 @@ export const store = new Vuex.Store({
                 commit('registerWeb3Instance', result);
             } catch (err) {
                 console.log('error in action registerWeb3', err);
+            }
+        },
+        async getContractInstance({ commit }) {
+            try {
+                let result = await getContract;
+                commit('registerContractInstance', result);
+            } catch (err) {
+                console.log('error in action getContractInstance', err);
             }
         }
     },
@@ -38,6 +47,10 @@ export const store = new Vuex.Store({
             console.log('pollWeb3Instance mutation being executed', payload);
             state.web3.coinbase = payload.coinbase;
             state.web3.balance = parseInt(payload.balance, 10);
+        },
+        registerContractInstance(state, payload) {
+            console.log('Wanted Ethereum contract instance: ', payload);
+            state.contractInstance = () => payload;
         }
     }
 });
